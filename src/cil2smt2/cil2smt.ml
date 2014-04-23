@@ -3,6 +3,7 @@ open Batteries
 open IO
 open Smt2_cmd
 open Basic
+open Int64
 
 type expr =
   | E of Basic.exp
@@ -38,11 +39,11 @@ let any f bs =
   not (all f bs)
 
 let gensym : unit -> string =
-  let i = ref 0 in
+  let i = ref zero in
   fun () ->
   begin
-    i := !i + 1;
-    string_of_int !i
+    i := add !i one;
+    string_of_int (Int64.to_int !i)
   end
 
 class removeUnnecessaryCodeVisitor =
@@ -92,6 +93,8 @@ class ssaTransformVisitor =
       | _ -> DoChildren
   end
 
+let debug = ref false
+
 let rec translation file_name=
   let cil_file = Frontc.parse file_name () in
   visitCilFile (new removeUnnecessaryCodeVisitor) cil_file;
@@ -100,7 +103,12 @@ let rec translation file_name=
   Simplify.simpleMem := true;
   Simplify.onlyVariableBasics := false;
   List.iter Simplify.doGlobal cil_file.globals;
-  (* dumpFile defaultCilPrinter Pervasives.stdout "codegen" cil_file; *)
+  begin
+    match !debug with
+    | true ->
+      dumpFile defaultCilPrinter Pervasives.stdout "codegen" cil_file;
+    | _ -> ();
+  end;
   let globals = List.filter is_gfun cil_file.globals in
   let exprs = List.flatten (List.map translate_function globals) in
   match (all is_formula exprs) with
@@ -314,7 +322,14 @@ and translate_exps exps : expr list =
               | _ -> failwith "not all formula"
             end
         end
-    | CastE _ -> failwith "not now castE"
+    | CastE (_, e) ->
+      begin
+        let e = translate_exps [e] in
+        match all is_exp e with
+        | true ->
+          List.hd e
+        | false -> failwith "not a expression for caste"
+      end
     | AddrOf _ -> failwith "not now addrOf"
     | StartOf _ -> failwith "not now startOf"
     | Question _ -> failwith "not now question"
@@ -346,7 +361,8 @@ and translate_lval l : Basic.exp =
 
 and translate_const (c : Cil.constant) =
   match c with
-  | CInt64 (i, _, _) -> failwith "not now int 64"
+  | CInt64 (i, _, _) ->
+    Basic.Num (to_float i)
   | CStr _ -> failwith "not now string"
   | CWStr _ -> failwith "not now CWStr"
   | CChr _ -> failwith "not now char"
