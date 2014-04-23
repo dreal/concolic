@@ -1,0 +1,13 @@
+OASISFormat: 0.4
+Name:        trans
+Version:     0.0.1
+Synopsis:    translator
+Authors:     
+License:     GPL-3
+
+Executable cil2smt
+  Path:       ./
+  BuildTools: ocamlbuild
+  MainIs:     cil2smt.ml
+  BuildDepends: batteries, cil
+  
